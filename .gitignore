@@ -1,0 +1,8 @@
+# .gitignore
+*.parquet
+*.txt
+*.log
+outputs/
+inputs/
+__pycache__/
+.streamlit/
