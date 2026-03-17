@@ -11,4 +11,5 @@ Please select a feature from the sidebar on the left.
 - **Job Generator**: Generate execution scripts for the Apollo server
 - **EPH/OBS Generator**: Generate input data with periodic scaling
 - **Data Integration**: Integrate infrared and visible light data (under development)
+- **Data Inspector**: Inspect and visualize uploaded Parquet files
 """)
