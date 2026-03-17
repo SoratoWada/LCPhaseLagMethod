@@ -1,29 +1,14 @@
+# app.py
 import streamlit as st
-import numpy as np
-import io
-from itertools import product
-from dataclasses import dataclass
-from typing import List
-import math
 
-# --- データ構造 ---
-@dataclass
-class TPMParam:
-    lon_a: int
-    lat_b: int
-    alpha_c: int
-    gamma_d: int
-    period_e: str
-    axis_ratio_g: float
+st.set_page_config(page_title="Apollo TPM Toolset", layout="wide")
 
-# --- 計算ロジッククラス (SH生成用) ---
-class ApolloCommandBuilder:
-    def __init__(self, batch_size: int = 6):
-        self.batch_size = batch_size
+st.title("🪐 Apollo TPM Analysis Toolset")
+st.markdown("""
+This tool assists in automating and analyzing thermal model (TPM) calculations for asteroids.
+Please select a feature from the sidebar on the left.
 
-    def calculate_f(self, a: int) -> int:
-        return a - 90 if a >= 0 else a + 90
-
-# --- UI 制御 ---
-st.set_page_config(page_title="TPM Expert Toolset", layout="wide")
-mode = st.sidebar.radio("Menu", ["1. Shell Script 生成", "2. EPH ファイル生成", "3. OBS ファイル生成"])
+- **Job Generator**: Generate execution scripts for the Apollo server
+- **EPH/OBS Generator**: Generate input data with periodic scaling
+- **Data Integration**: Integrate infrared and visible light data (under development)
+""")
