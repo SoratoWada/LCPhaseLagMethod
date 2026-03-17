@@ -7,7 +7,7 @@ from src.data_processor import integrate_tpm_and_hapke
 st.title("📦 Hapke & TPM Data Integration")
 
 st.markdown("""
-### 使い方
+### Instructions
 1. Upload file TPM Parquet
 2. Upload multiple corresponding Hapke model CSV files.
    - The file name must contain `lon`, `lat`, and `Stype`/`Ctype`.
