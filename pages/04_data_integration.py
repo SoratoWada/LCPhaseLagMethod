@@ -38,8 +38,17 @@ if tpm_file and hapke_files:
 
         st.success("Integration complete!")
         st.write(df_unified.head())
-        
-        # ダウンロードボタン
+
+        st.subheader("Data Summary")
+        st.write(df_unified.describe()) # Statistics on numerical data (mean, maximum, minimum, etc.)
+
+        # Check for missing values (NaN)
+        if df_unified[['vis_flux_S', 'vis_flux_C']].isnull().any().any():
+            st.warning("Warning: Some rows have missing visible flux data.")
+        else:
+            st.success("All rows successfully integrated with visible flux!")
+
+        # Show the download button
         out_bio = io.BytesIO()
         df_unified.to_parquet(out_bio, index=False, compression='zstd')
         st.download_button(
