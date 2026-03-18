@@ -48,3 +48,32 @@ def integrate_tpm_and_hapke(df_tpm, dict_hapke):
         unified_chunks.append(group)
     
     return pd.concat(unified_chunks, ignore_index=True)
+
+def apply_tpm_phase_correction(df):
+    """
+    Apply a phase correction due to the coordinate system to TPM data (category == 'IR').
+    Correction formula: time = time + (lon_a - 90) / 360 * (period / 86400)
+    """
+    df_corr = df.copy()
+    SECONDS_IN_DAY = 86400
+
+    # Extract only IR category
+    mask = df_corr['category'] == 'IR'
+    mask = df_corr['category'] == 'IR'
+    
+    if mask.any():
+        # Convert period from string like "100s" to numeric
+        def get_period_val(p):
+            if isinstance(p, str):
+                return float(p.replace('s', ''))
+            return float(p)
+
+        # Execute the correction calculation
+        # Use loc to safely update values
+        lon_a = df_corr.loc[mask, 'lon_a']
+        period_vals = df_corr.loc[mask, 'period'].apply(get_period_val)
+        
+        correction = (lon_a - 90) / 360 * (period_vals / SECONDS_IN_DAY)
+        df_corr.loc[mask, 'time'] += correction
+        
+    return df_corr
