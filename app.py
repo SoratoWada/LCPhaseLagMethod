@@ -13,4 +13,5 @@ Please select a feature from the sidebar on the left.
 - **Data Integration**: Integrate infrared and visible light data (under development)
 - **Phase Corrector**: Emergency tool for fixing TPM phase errors (New)
 - **Data Inspector**: Inspect and visualize uploaded Parquet files
+- **Lag-Lag Diagram**: Generate lag-lag diagrams for phase analysis
 """)
