@@ -46,10 +46,9 @@ if uploaded_file:
     x_min, x_max = axis_range_control("X-axis [deg]", -180, 180, (-90, 90))
     y_min, y_max = axis_range_control("Y-axis [deg]", -180, 180, (-20, 20))
 
-    # --- 4. Quality Control (Histogram 追加) ---
+    # --- 4. Quality Control (Histogram & Threshold) ---
     st.sidebar.header("4. Quality Control")
     
-    # 現在の Global Constants で絞り込んだベースデータ（閾値適用前）
     mask_base = (df['period'] == common_p_str)
     if 'alpha' in df.columns: mask_base &= (df['alpha'] == common_alpha)
     if 'axis_ratio' in df.columns: mask_base &= (df['axis_ratio'] == common_ar)
@@ -61,7 +60,6 @@ if uploaded_file:
         ax_h.hist(base_df['amp_ratio'].dropna(), bins=30, color='teal', alpha=0.7, edgecolor='white')
         ax_h.set_xlabel("Amp Ratio", fontsize=8)
         ax_h.set_ylabel("Count", fontsize=8)
-        # ユーザー要望に基づき、表示範囲を 0.2~0.3 程度に制限（またはデータ最大値）
         current_max = base_df['amp_ratio'].max()
         ax_h.set_xlim(0, max(0.2, current_max * 1.1))
         ax_h.tick_params(labelsize=7)
@@ -103,7 +101,6 @@ if uploaded_file:
 
     # --- 6. 描画実行 ---
     if st.button("Generate Diagram"):
-        # 閾値を適用
         target_df = base_df[base_df['amp_ratio'] >= amp_min]
         
         lons = sorted(target_df['lon_a'].unique())
@@ -114,6 +111,10 @@ if uploaded_file:
         for g in gammas:
             for lat in lats:
                 for lon in lons:
+                    # lat=90, -90の場合はlon=0のみをプロット対象とする
+                    if abs(lat) == 90 and lon != 0:
+                        continue
+
                     def get_phase_val(target, g_val, l_val, lo_val):
                         m = (target_df['lon_a'] == lo_val) & (target_df['lat_b'] == l_val)
                         if target['cat'] == "Visible":
@@ -131,7 +132,7 @@ if uploaded_file:
                     if all(v is not None for v in [p_xa, p_xb, p_ya, p_yb]):
                         lx = (p_xa - p_xb) + (lon / 360.0 + 0.25 if use_corr else 0)
                         ly = p_ya - p_yb
-                        # 循環処理
+                        # 循環処理 (-0.25 to 0.25)
                         lx = (lx + 0.25) % 0.5 - 0.25
                         ly = (ly + 0.25) % 0.5 - 0.25
                         plot_results.append({'gamma': g, 'lat': lat, 'x_deg': lx * 360, 'y_deg': ly * 360})
@@ -140,8 +141,8 @@ if uploaded_file:
             st.error("No data points found matching criteria.")
         else:
             plot_df = pd.DataFrame(plot_results)
-            colors_map = {'10': '#17becf', '30': '#4fbdb1', '100': '#bcbd22', '300': '#d29b77', '1000': '#e377c2'}
-            
+            colors_map = {'10': '#17becf', '100': '#bcbd22', '1000': '#e377c2'}
+
             fig, ax = plt.subplots(figsize=(12, 9))
             for _, row in plot_df.iterrows():
                 g_key = str(int(row['gamma']))
@@ -155,7 +156,6 @@ if uploaded_file:
             ax.set_xlim(x_min, x_max)
             ax.set_ylim(y_min, y_max)
             
-            # 動的なラベルとタイトル
             ax.set_xlabel(f'Phase Lag: {t_x_a["val"]} - {t_x_b["val"]} [deg]', fontsize=12, fontweight='bold')
             ax.set_ylabel(f'Phase Lag: {t_y_a["val"]} - {t_y_b["val"]} [deg]', fontsize=12, fontweight='bold')
             ax.set_title(f'Lag-Lag Diagram\n(P={common_p_str}, α={common_alpha}°, AR={common_ar}, Min Amp Ratio={amp_min})', fontsize=15, pad=20)
@@ -164,11 +164,11 @@ if uploaded_file:
             ax.axhline(0, color='black', lw=1, alpha=0.3)
             ax.axvline(0, color='black', lw=1, alpha=0.3)
             
-            # 第2軸（時間軸）
+            # 第2軸（時間軸）の表示
             ax.secondary_xaxis('top', functions=(lambda x: x/360*period_val, lambda x: x/period_val*360)).set_xlabel('Time Lag [s]')
             ax.secondary_yaxis('right', functions=(lambda x: x/360*period_val, lambda x: x/period_val*360)).set_ylabel('Time Lag [s]')
 
-            # 凡例
+            # 凡例の作成
             gamma_h = [Line2D([0], [0], marker='s', color='w', label=f'Γ={g}', markerfacecolor=colors_map.get(g, 'black'), markersize=10) for g in sorted(colors_map.keys(), key=int)]
             lat_h = [
                 Line2D([0], [0], marker='^', color='w', label='Lat > 0', markerfacecolor='gray', markersize=10),
