@@ -61,6 +61,7 @@ if uploaded_file:
             ax2.plot(vis_plot['time'], vis_plot['flux'], color='black', linestyle='--', label=f"Vis ({v_type})")
             ax2.set_ylabel("Visible Flux")
 
+    ax1.set_xbound(lower=0, upper=0.00115741)  # 0 to 1000 seconds in days
     ax1.set_xlabel("Time")
     ax1.set_ylabel("IR Flux")
     ax1.legend(loc='upper left')
