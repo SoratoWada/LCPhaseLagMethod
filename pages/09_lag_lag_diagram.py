@@ -253,6 +253,7 @@ if uploaded_file:
             secy.set_ylabel('Time Lag [s]', fontsize=secondary_label_fontsize)
             secy.tick_params(labelsize=tick_fontsize)
 
+            extra_artists = []
             if show_legend:
                 legend_marker_size = max(6, int(legend_fontsize))
                 gamma_h = [
@@ -279,6 +280,7 @@ if uploaded_file:
                     borderaxespad=0.0,
                 )
                 ax.add_artist(leg_gamma)
+                extra_artists.append(leg_gamma)
 
                 if marker_mode.startswith("Unified"):
                     lat_h = [
@@ -304,7 +306,7 @@ if uploaded_file:
                         Line2D([0], [0], marker='v', linestyle='None', color='gray', label='Lat ≤ -60°', markerfacecolor='gray', markersize=legend_marker_size),
                     ]
 
-                ax.legend(
+                leg_lat = ax.legend(
                     handles=lat_h,
                     title="Spin-axis",
                     loc='upper left',
@@ -314,17 +316,33 @@ if uploaded_file:
                     frameon=True,
                     borderaxespad=0.0,
                 )
+                extra_artists.append(leg_lat)
 
                 fig.subplots_adjust(right=0.62)
             else:
                 fig.subplots_adjust(right=0.98)
 
+            pad_inches = 0.45 if show_title else 0.80
             buf_png = io.BytesIO()
-            fig.savefig(buf_png, format="png", dpi=200, bbox_inches="tight", pad_inches=0.45)
+            fig.savefig(
+                buf_png,
+                format="png",
+                dpi=200,
+                bbox_inches="tight",
+                bbox_extra_artists=extra_artists,
+                pad_inches=pad_inches,
+            )
             st.session_state["laglag_last_png"] = buf_png.getvalue()
 
             buf_jpg = io.BytesIO()
-            fig.savefig(buf_jpg, format="jpg", dpi=200, bbox_inches="tight", pad_inches=0.45)
+            fig.savefig(
+                buf_jpg,
+                format="jpg",
+                dpi=200,
+                bbox_inches="tight",
+                bbox_extra_artists=extra_artists,
+                pad_inches=pad_inches,
+            )
             st.session_state["laglag_last_jpg"] = buf_jpg.getvalue()
 
             st.session_state["laglag_last_caption"] = (
