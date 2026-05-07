@@ -2,6 +2,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import io
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from matplotlib.lines import Line2D
@@ -135,6 +136,17 @@ if uploaded_file:
     xlabel_text = st.sidebar.text_input("X-axis label text", value=default_xlabel)
     ylabel_text = st.sidebar.text_input("Y-axis label text", value=default_ylabel)
     title_text = st.sidebar.text_input("Title text", value=default_title)
+
+    st.sidebar.subheader("Export")
+    default_export_stem = (
+        f'Lag-lag_diagram_P{common_p_str}_alpha{int(common_alpha)}deg_minFA{amp_min:.2f}_'
+        f'marker{"varied" if marker_mode.startswith("Varied") else "unified"}'
+    )
+    export_filename_stem = st.sidebar.text_input(
+        "Export filename (without extension)",
+        value=default_export_stem,
+        help='例: Lag-lag_diagram_P100s_alpha90deg_minFA0.07_optmodelHapke_..._markervaried',
+    )
 
     # --- 7. 描画実行 ---
     if st.button("Generate Diagram"):
@@ -307,4 +319,47 @@ if uploaded_file:
             else:
                 fig.subplots_adjust(right=0.98)
 
-            st.pyplot(fig)
+            buf_png = io.BytesIO()
+            fig.savefig(buf_png, format="png", dpi=200, bbox_inches="tight", pad_inches=0.45)
+            st.session_state["laglag_last_png"] = buf_png.getvalue()
+
+            buf_jpg = io.BytesIO()
+            fig.savefig(buf_jpg, format="jpg", dpi=200, bbox_inches="tight", pad_inches=0.45)
+            st.session_state["laglag_last_jpg"] = buf_jpg.getvalue()
+
+            st.session_state["laglag_last_caption"] = (
+                f'P={common_p_str}, α={common_alpha}°, AR={common_ar}, Min FA={amp_min}'
+            )
+            st.session_state["laglag_last_export_stem"] = export_filename_stem
+
+            st.image(
+                st.session_state["laglag_last_png"],
+                caption=st.session_state["laglag_last_caption"],
+                use_container_width=True,
+            )
+
+    # 設定をいじって再実行されても、最後に生成した図は保持して表示する
+    if "laglag_last_png" in st.session_state:
+        st.subheader("Last generated diagram (kept until next Generate Diagram)")
+        st.image(
+            st.session_state["laglag_last_png"],
+            caption=st.session_state.get("laglag_last_caption", ""),
+            use_container_width=True,
+        )
+        export_stem = st.session_state.get("laglag_last_export_stem", "Lag-lag_diagram")
+        c_png, c_jpg = st.columns(2)
+        with c_png:
+            st.download_button(
+                label="Download PNG",
+                data=st.session_state["laglag_last_png"],
+                file_name=f"{export_stem}.png",
+                mime="image/png",
+            )
+        with c_jpg:
+            if "laglag_last_jpg" in st.session_state:
+                st.download_button(
+                    label="Download JPEG",
+                    data=st.session_state["laglag_last_jpg"],
+                    file_name=f"{export_stem}.jpg",
+                    mime="image/jpeg",
+                )
