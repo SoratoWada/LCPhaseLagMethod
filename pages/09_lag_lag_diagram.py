@@ -43,11 +43,32 @@ if uploaded_file:
         high = c2.number_input("Max", value=float(val_range[1]), key=f"{label}_high")
         return low, high
 
-    x_min, x_max = axis_range_control("X-axis [deg]", -180, 180, (-90, 90))
-    y_min, y_max = axis_range_control("Y-axis [deg]", -180, 180, (-20, 20))
+    x_min, x_max = axis_range_control("X-axis [deg]", -180, 180, (-60, 60))
+    y_min, y_max = axis_range_control("Y-axis [deg]", -180, 180, (-15, 15))
 
-    # --- 4. Quality Control (Histogram & Threshold) ---
-    st.sidebar.header("4. Quality Control")
+    # --- 4. Text & Legend Settings ---
+    st.sidebar.header("4. Text & Legend Settings")
+    show_legend = st.sidebar.checkbox("Show legend", value=True)
+    show_title = st.sidebar.checkbox("Show title", value=True)
+    axis_label_fontsize = st.sidebar.slider("Axis label font size", 8, 40, 24, step=1)
+    tick_fontsize = st.sidebar.slider("Tick label font size", 6, 40, 18, step=1)
+    title_fontsize = st.sidebar.slider("Title font size", 10, 50, 28, step=1)
+    secondary_label_fontsize = st.sidebar.slider("Secondary axis label font size", 8, 40, 24, step=1)
+    legend_fontsize = st.sidebar.slider("Legend font size", 6, 40, 20, step=1)
+    legend_title_fontsize = st.sidebar.slider("Legend title font size", 6, 50, 24, step=1)
+    marker_size = st.sidebar.slider("Marker size", 10, 800, 350, step=10)
+
+    marker_mode = st.sidebar.selectbox(
+        "Marker shape mode",
+        ["Varied (by latitude, previous behavior)", "Unified (single marker)"],
+        index=0,
+    )
+    unified_marker = None
+    if marker_mode.startswith("Unified"):
+        unified_marker = st.sidebar.selectbox("Unified marker", ["o", "s", "^", "v", "+", "x", "D"], index=0)
+
+    # --- 5. Quality Control (Histogram & Threshold) ---
+    st.sidebar.header("5. Quality Control")
     
     mask_base = (df['period'] == common_p_str)
     if 'alpha' in df.columns: mask_base &= (df['alpha'] == common_alpha)
@@ -55,22 +76,24 @@ if uploaded_file:
     base_df = df[mask_base]
 
     if not base_df.empty:
-        st.sidebar.write("**Amplitude Ratio Distribution**")
+        st.sidebar.write("**Fractional Amplitude Distribution**")
         fig_h, ax_h = plt.subplots(figsize=(4, 2.5))
         ax_h.hist(base_df['amp_ratio'].dropna(), bins=30, color='teal', alpha=0.7, edgecolor='white')
-        ax_h.set_xlabel("Amp Ratio", fontsize=8)
-        ax_h.set_ylabel("Count", fontsize=8)
+        hist_label_fs = min(axis_label_fontsize, 12)
+        hist_tick_fs = min(tick_fontsize, 9)
+        ax_h.set_xlabel("Fractional Amplitude", fontsize=hist_label_fs)
+        ax_h.set_ylabel("Count", fontsize=hist_label_fs)
         current_max = base_df['amp_ratio'].max()
         ax_h.set_xlim(0, max(0.2, current_max * 1.1))
-        ax_h.tick_params(labelsize=7)
+        ax_h.tick_params(labelsize=hist_tick_fs)
         st.sidebar.pyplot(fig_h)
 
-    st.sidebar.write("**Min Amplitude Ratio Threshold**")
-    st.sidebar.slider("Threshold Slider", 0.0, 1.0, 0.0, step=0.01, key="amp_min_slider", label_visibility="collapsed")
+    st.sidebar.write("**Min Fractional Amplitude Threshold**")
+    st.sidebar.slider("Threshold Slider", 0.0, 1.0, 0.07, step=0.01, key="amp_min_slider", label_visibility="collapsed")
     st.sidebar.number_input("Value Input", min_value=0.0, max_value=1.0, value=st.session_state.amp_min_slider, step=0.01, key="amp_min_number")
     amp_min = st.session_state.amp_min_number
 
-    # --- 5. 位相差（Lag）の設定 ---
+    # --- 6. 位相差（Lag）の設定 ---
     st.subheader("Lag Calculation Settings")
     def target_selector(label, key_suffix, def_cat, def_val):
         c_cat, c_val = st.columns([1, 1])
@@ -99,7 +122,21 @@ if uploaded_file:
 
     use_corr = st.checkbox("X軸に Longitude 補正を適用する", value=True)
 
-    # --- 6. 描画実行 ---
+    def format_target_for_label(t):
+        if t["cat"] == "Visible":
+            return "Visible"
+        return f'{t["val"]}μm'
+
+    default_xlabel = f'Phase Lag: {format_target_for_label(t_x_a)} - {format_target_for_label(t_x_b)} [deg]'
+    default_ylabel = f'Phase Lag: {format_target_for_label(t_y_a)} - {format_target_for_label(t_y_b)} [deg]'
+    default_title = f'Lag-Lag Diagram\n(P={common_p_str}, α={common_alpha}°, AR={common_ar}, Min FA={amp_min})'
+
+    st.sidebar.subheader("Text Overrides")
+    xlabel_text = st.sidebar.text_input("X-axis label text", value=default_xlabel)
+    ylabel_text = st.sidebar.text_input("Y-axis label text", value=default_ylabel)
+    title_text = st.sidebar.text_input("Title text", value=default_title)
+
+    # --- 7. 描画実行 ---
     if st.button("Generate Diagram"):
         target_df = base_df[base_df['amp_ratio'] >= amp_min]
         
@@ -143,41 +180,131 @@ if uploaded_file:
             plot_df = pd.DataFrame(plot_results)
             colors_map = {'10': '#17becf', '100': '#bcbd22', '1000': '#e377c2'}
 
-            fig, ax = plt.subplots(figsize=(12, 9))
+            fig, ax = plt.subplots(figsize=(15, 9))
+
+            def lat_to_marker_style(lat, color):
+                if marker_mode.startswith("Unified"):
+                    return {"marker": unified_marker, "facecolor": color, "linewidths": 0.5}
+
+                if lat >= 60:
+                    return {"marker": "^", "facecolor": color, "linewidths": 0.5}
+                if lat == 30:
+                    return {"marker": "^", "facecolor": "None", "linewidths": 1.5}
+                if lat == 0:
+                    return {"marker": "+", "facecolor": color, "linewidths": 2.0}
+                if lat == -30:
+                    return {"marker": "v", "facecolor": "None", "linewidths": 1.5}
+                if lat <= -60:
+                    return {"marker": "v", "facecolor": color, "linewidths": 0.5}
+                return {"marker": "o", "facecolor": color, "linewidths": 0.5}
+
             for _, row in plot_df.iterrows():
                 g_key = str(int(row['gamma']))
                 color = colors_map.get(g_key, 'black')
                 lat = row['lat']
-                m = '^' if lat > 0 else ('v' if lat < 0 else '+')
-                fc = 'None' if abs(lat) == 30 else color
-                lw = 1.5 if abs(lat) == 30 else 0.5
-                ax.scatter(row['x_deg'], row['y_deg'], color=color, marker=m, facecolor=fc, s=200, linewidths=lw, alpha=0.8)
+                style = lat_to_marker_style(lat, color)
+                ax.scatter(
+                    row['x_deg'],
+                    row['y_deg'],
+                    color=color,
+                    marker=style["marker"],
+                    facecolor=style["facecolor"],
+                    s=marker_size,
+                    linewidths=style["linewidths"],
+                    alpha=0.8,
+                )
 
             ax.set_xlim(x_min, x_max)
             ax.set_ylim(y_min, y_max)
+            x_span = float(abs(x_max - x_min))
+            y_span = float(abs(y_max - y_min))
+            if x_span > 0 and y_span > 0:
+                ax.set_aspect(x_span / y_span, adjustable="box")
             
-            ax.set_xlabel(f'Phase Lag: {t_x_a["val"]} - {t_x_b["val"]} [deg]', fontsize=12, fontweight='bold')
-            ax.set_ylabel(f'Phase Lag: {t_y_a["val"]} - {t_y_b["val"]} [deg]', fontsize=12, fontweight='bold')
-            ax.set_title(f'Lag-Lag Diagram\n(P={common_p_str}, α={common_alpha}°, AR={common_ar}, Min Amp Ratio={amp_min})', fontsize=15, pad=20)
+            ax.set_xlabel(xlabel_text, fontsize=axis_label_fontsize)
+            ax.set_ylabel(ylabel_text, fontsize=axis_label_fontsize)
+            if show_title:
+                ax.set_title(title_text, fontsize=title_fontsize, pad=20)
+
+            ax.tick_params(axis='both', labelsize=tick_fontsize)
             
             ax.grid(True, linestyle=':', alpha=0.6)
             ax.axhline(0, color='black', lw=1, alpha=0.3)
             ax.axvline(0, color='black', lw=1, alpha=0.3)
             
             # 第2軸（時間軸）の表示
-            ax.secondary_xaxis('top', functions=(lambda x: x/360*period_val, lambda x: x/period_val*360)).set_xlabel('Time Lag [s]')
-            ax.secondary_yaxis('right', functions=(lambda x: x/360*period_val, lambda x: x/period_val*360)).set_ylabel('Time Lag [s]')
+            secx = ax.secondary_xaxis('top', functions=(lambda x: x/360*period_val, lambda x: x/period_val*360))
+            secx.set_xlabel('Time Lag [s]', fontsize=secondary_label_fontsize, labelpad=10)
+            secx.tick_params(labelsize=tick_fontsize)
 
-            # 凡例の作成
-            gamma_h = [Line2D([0], [0], marker='s', color='w', label=f'Γ={g}', markerfacecolor=colors_map.get(g, 'black'), markersize=10) for g in sorted(colors_map.keys(), key=int)]
-            lat_h = [
-                Line2D([0], [0], marker='^', color='w', label='Lat > 0', markerfacecolor='gray', markersize=10),
-                Line2D([0], [0], marker='+', color='gray', label='Lat = 0', markersize=10, markeredgewidth=2),
-                Line2D([0], [0], marker='v', color='w', label='Lat < 0', markerfacecolor='gray', markersize=10),
-                Line2D([0], [0], marker='^', color='w', label='|Lat|=30 (Open)', markerfacecolor='None', markeredgecolor='gray', markersize=10)
-            ]
-            ax.add_artist(ax.legend(handles=gamma_h, title="Thermal Inertia", loc='upper left', bbox_to_anchor=(1.15, 1)))
-            ax.legend(handles=lat_h, title="Latitude", loc='upper left', bbox_to_anchor=(1.15, 0.6))
+            secy = ax.secondary_yaxis('right', functions=(lambda x: x/360*period_val, lambda x: x/period_val*360))
+            secy.set_ylabel('Time Lag [s]', fontsize=secondary_label_fontsize)
+            secy.tick_params(labelsize=tick_fontsize)
 
-            plt.subplots_adjust(right=0.8)
+            if show_legend:
+                legend_marker_size = max(6, int(legend_fontsize))
+                gamma_h = [
+                    Line2D(
+                        [0],
+                        [0],
+                        marker='s',
+                        linestyle='None',
+                        color='w',
+                        label=rf'$\Gamma$ = {g} tiu',
+                        markerfacecolor=colors_map.get(g, 'black'),
+                        markersize=legend_marker_size,
+                    )
+                    for g in sorted(colors_map.keys(), key=int)
+                ]
+                leg_gamma = ax.legend(
+                    handles=gamma_h,
+                    title="Thermal Inertia",
+                    loc='upper left',
+                    bbox_to_anchor=(1.15, 1.0),
+                    fontsize=legend_fontsize,
+                    title_fontsize=legend_title_fontsize,
+                    frameon=True,
+                    borderaxespad=0.0,
+                )
+                ax.add_artist(leg_gamma)
+
+                if marker_mode.startswith("Unified"):
+                    lat_h = [
+                        Line2D(
+                            [0],
+                            [0],
+                            marker=unified_marker,
+                            linestyle='None',
+                            color='gray',
+                            label='All latitudes',
+                            markerfacecolor='gray' if unified_marker not in ["+", "x"] else 'None',
+                            markeredgecolor='gray',
+                            markeredgewidth=2 if unified_marker in ["+", "x"] else 0.5,
+                            markersize=legend_marker_size,
+                        )
+                    ]
+                else:
+                    lat_h = [
+                        Line2D([0], [0], marker='^', linestyle='None', color='gray', label='Lat ≥ 60°', markerfacecolor='gray', markersize=legend_marker_size),
+                        Line2D([0], [0], marker='^', linestyle='None', color='gray', label='Lat = 30°', markerfacecolor='None', markeredgecolor='gray', markeredgewidth=1.5, markersize=legend_marker_size),
+                        Line2D([0], [0], marker='+', linestyle='None', color='gray', label='Lat = 0°', markeredgewidth=2, markersize=legend_marker_size),
+                        Line2D([0], [0], marker='v', linestyle='None', color='gray', label='Lat = -30°', markerfacecolor='None', markeredgecolor='gray', markeredgewidth=1.5, markersize=legend_marker_size),
+                        Line2D([0], [0], marker='v', linestyle='None', color='gray', label='Lat ≤ -60°', markerfacecolor='gray', markersize=legend_marker_size),
+                    ]
+
+                ax.legend(
+                    handles=lat_h,
+                    title="Spin-axis",
+                    loc='upper left',
+                    bbox_to_anchor=(1.15, 0.62),
+                    fontsize=legend_fontsize,
+                    title_fontsize=legend_title_fontsize,
+                    frameon=True,
+                    borderaxespad=0.0,
+                )
+
+                fig.subplots_adjust(right=0.62)
+            else:
+                fig.subplots_adjust(right=0.98)
+
             st.pyplot(fig)
